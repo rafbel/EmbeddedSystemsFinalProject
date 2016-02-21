@@ -1,0 +1,21 @@
+################################################################################
+# These macros are used by makefiles and argument files.
+# When a space is included in the path and quotes (") cannot be used,
+# a _ESCAPE version of the macro is added that escapes the space with backslash (\).
+################################################################################
+
+export PMC=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/pmc
+export PLATINUM=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum
+export GNU_Make_Install_DirEnv=$(CWInstallLocationEnv)/gnu/bin
+export ProjDirPath=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/build/cw/platinum/kl25_platinum
+export CWInstallLocationEnv=C:/Freescale/CW MCU v10.6
+export MCG=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/mcg
+export CPU=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/cpu
+export UART=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/uart
+export RTC=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/rtc
+export SMC=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/smc
+export LLWU=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/llwu
+export COMMON=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/common
+export LPTMR=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/lptmr
+export RCM=C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/drivers/rcm
+export ARMSourceryDirEnv=$(CWInstallLocationEnv)/Cross_Tools/arm-none-eabi-gcc-4_7_3/bin

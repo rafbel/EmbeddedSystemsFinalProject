@@ -1,0 +1,1012 @@
+   1              		.cpu cortex-m0
+   2              		.fpu softvfp
+   3              		.eabi_attribute 20, 1
+   4              		.eabi_attribute 21, 1
+   5              		.eabi_attribute 23, 3
+   6              		.eabi_attribute 24, 1
+   7              		.eabi_attribute 25, 1
+   8              		.eabi_attribute 26, 1
+   9              		.eabi_attribute 30, 2
+  10              		.eabi_attribute 34, 0
+  11              		.eabi_attribute 18, 4
+  12              		.code	16
+  13              		.file	"platinum.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.section	.text.UART0_get_cmd,"ax",%progbits
+  18              		.align	2
+  19              		.global	UART0_get_cmd
+  20              		.code	16
+  21              		.thumb_func
+  23              	UART0_get_cmd:
+  24              	.LFB1:
+  25              		.file 1 "C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum/platinum.c"
+   1:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** /*
+   2:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****  * File:		platinum.c
+   3:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****  * Purpose:		Main process
+   4:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****  *
+   5:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****  */
+   6:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** //There is a strange error on first time importing code. 
+   7:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** //Something along the lines mw32 file lacking target to [platinum.c directory] 
+   8:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** //restarting the computer and rebuilding the code seems to solve this error.
+   9:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  10:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** //A lot of this code was included with the progress you made on platinum. 
+  11:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** //The main changes we made were setting c1Mod and c3Mod, changing the pwm signals,and wrote parser 
+  12:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  13:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  14:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #include "common.h"
+  15:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #include "uart.h"
+  16:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #include "ddefs2.h"
+  17:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #include "mcg.h"
+  18:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #include "stdio.h"
+  19:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** //#include "derivative.h"
+  20:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  21:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #ifdef CMSIS
+  22:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #include "start.h"
+  23:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #endif
+  24:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  25:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static int k, waittime = 0x0A05;
+  26:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static unsigned char redButtonDown = FALSE, blueButtonDown = FALSE;
+  27:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static long absoluteTime = 0;
+  28:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static char buf[40];
+  29:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static int dim, nvals, nstrs, lp, cmdflg = 0;
+  30:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static elem_t el;
+  31:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static struct pars_list *pars = NULL;
+  32:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static char* p[10];
+  33:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static char command[35];
+  34:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int c1Mod = 12000;  //Mod values of pulses at startup. Sets servo to 0 degrees in both directions.
+  35:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int c3Mod = 12000;
+  36:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  37:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** /********************************************************************/
+  38:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  39:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int strfrac(char *s, char *p[]); //Something to do with Putty
+  40:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  41:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****  struct pars_list
+  42:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	prstbl[] =
+  43:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	{
+  44:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	"SET",0,1,1,1,
+  45:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	"GET",1,1,1,1,
+  46:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	"STATUS",2,1,1,0
+  47:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	}; 
+  48:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  49:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** static void WriteToUART0(const char *text){ //UART0 Module used to write to Putty.
+  50:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	while (*text != '\0'){
+  51:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		uart0_putchar(UART0_BASE_PTR, *text);
+  52:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		text++;
+  53:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	}
+  54:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** }
+  55:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  56:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** void UART0_get_cmd(void){ //UART0 Module to establish communication with Putty.
+  26              		.loc 1 56 0
+  27              		.cfi_startproc
+  28 0000 10B5     		push	{r4, lr}
+  29              	.LCFI0:
+  30              		.cfi_def_cfa_offset 8
+  31              		.cfi_offset 4, -8
+  32              		.cfi_offset 14, -4
+  57:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	static unsigned char i=0; 
+  58:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	unsigned char rc;
+  59:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	rc = in_char();
+  33              		.loc 1 59 0
+  34 0002 FFF7FEFF 		bl	in_char
+  35              	.LVL0:
+  60:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	if (i >= sizeof(command)-1 || rc == 0x0D) {
+  36              		.loc 1 60 0
+  37 0006 0A4A     		ldr	r2, .L6
+  38 0008 1378     		ldrb	r3, [r2]
+  39 000a 212B     		cmp	r3, #33
+  40 000c 06D8     		bhi	.L2
+  41              		.loc 1 60 0 is_stmt 0
+  42 000e 0D28     		cmp	r0, #13
+  43 0010 04D0     		beq	.L2
+  61:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		command [i] = '\0';
+  62:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		i = 0;
+  63:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		cmdflg = TRUE;
+  64:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	} else {
+  65:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		command[i] = rc;
+  44              		.loc 1 65 0 is_stmt 1
+  45 0012 0849     		ldr	r1, .L6+4
+  46 0014 C854     		strb	r0, [r1, r3]
+  66:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		i++;
+  47              		.loc 1 66 0
+  48 0016 0133     		add	r3, r3, #1
+  49 0018 1370     		strb	r3, [r2]
+  50 001a 06E0     		b	.L4
+  51              	.L2:
+  61:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		command [i] = '\0';
+  52              		.loc 1 61 0
+  53 001c 054C     		ldr	r4, .L6+4
+  54 001e 0021     		mov	r1, #0
+  55 0020 E154     		strb	r1, [r4, r3]
+  63:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		cmdflg = TRUE;
+  56              		.loc 1 63 0
+  57 0022 054B     		ldr	r3, .L6+8
+  62:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		i = 0;
+  58              		.loc 1 62 0
+  59 0024 1170     		strb	r1, [r2]
+  63:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		cmdflg = TRUE;
+  60              		.loc 1 63 0
+  61 0026 0122     		mov	r2, #1
+  62 0028 1A60     		str	r2, [r3]
+  63              	.L4:
+  67:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	}
+  68:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	out_char(rc);
+  64              		.loc 1 68 0
+  65 002a FFF7FEFF 		bl	out_char
+  66              	.LVL1:
+  69:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** }
+  67              		.loc 1 69 0
+  68              		@ sp needed for prologue
+  69 002e 10BD     		pop	{r4, pc}
+  70              	.L7:
+  71              		.align	2
+  72              	.L6:
+  73 0030 00000000 		.word	.LANCHOR0
+  74 0034 00000000 		.word	.LANCHOR1
+  75 0038 00000000 		.word	.LANCHOR2
+  76              		.cfi_endproc
+  77              	.LFE1:
+  79              		.section	.text.pulse,"ax",%progbits
+  80              		.align	2
+  81              		.global	pulse
+  82              		.code	16
+  83              		.thumb_func
+  85              	pulse:
+  86              	.LFB2:
+  70:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  71:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  72:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int pulse(int c1Mod, int c3Mod){ //This section of code it used to create the two pulses.
+  87              		.loc 1 72 0
+  88              		.cfi_startproc
+  89              	.LVL2:
+  90 0000 30B5     		push	{r4, r5, lr}
+  91              	.LCFI1:
+  92              		.cfi_def_cfa_offset 12
+  93              		.cfi_offset 4, -12
+  94              		.cfi_offset 5, -8
+  95              		.cfi_offset 14, -4
+  73:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	unsigned int count;
+  74:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	pll_init(8000000, HIGH_GAIN, CRYSTAL, 4, 24, MCGOUT);
+  96              		.loc 1 74 0
+  97 0002 1823     		mov	r3, #24
+  72:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int pulse(int c1Mod, int c3Mod){ //This section of code it used to create the two pulses.
+  98              		.loc 1 72 0
+  99 0004 83B0     		sub	sp, sp, #12
+ 100              	.LCFI2:
+ 101              		.cfi_def_cfa_offset 24
+  72:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int pulse(int c1Mod, int c3Mod){ //This section of code it used to create the two pulses.
+ 102              		.loc 1 72 0
+ 103 0006 051C     		mov	r5, r0
+ 104              		.loc 1 74 0
+ 105 0008 0120     		mov	r0, #1
+ 106              	.LVL3:
+ 107 000a 0093     		str	r3, [sp]
+ 108 000c 0190     		str	r0, [sp, #4]
+  72:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int pulse(int c1Mod, int c3Mod){ //This section of code it used to create the two pulses.
+ 109              		.loc 1 72 0
+ 110 000e 0C1C     		mov	r4, r1
+ 111              		.loc 1 74 0
+ 112 0010 0122     		mov	r2, #1
+ 113 0012 0121     		mov	r1, #1
+ 114              	.LVL4:
+ 115 0014 0423     		mov	r3, #4
+ 116 0016 1F48     		ldr	r0, .L9
+ 117 0018 FFF7FEFF 		bl	pll_init
+ 118              	.LVL5:
+  75:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	
+  76:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	SIM_SCGC6 |= SIM_SCGC6_TPM0_MASK | SIM_SCGC6_ADC0_MASK | SIM_SCGC6_DAC0_MASK;
+ 119              		.loc 1 76 0
+ 120 001c 1E4B     		ldr	r3, .L9+4
+ 121 001e 1F4A     		ldr	r2, .L9+8
+ 122 0020 8921     		mov	r1, #137
+ 123 0022 9858     		ldr	r0, [r3, r2]
+ 124 0024 0906     		lsl	r1, r1, #24
+ 125 0026 0143     		orr	r1, r0
+ 126 0028 9950     		str	r1, [r3, r2]
+  77:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	SIM_SOPT2 |= SIM_SOPT2_TPMSRC(1);
+ 127              		.loc 1 77 0
+ 128 002a 1D4A     		ldr	r2, .L9+12
+ 129 002c 8021     		mov	r1, #128
+ 130 002e 9858     		ldr	r0, [r3, r2]
+ 131 0030 4904     		lsl	r1, r1, #17
+ 132 0032 0143     		orr	r1, r0
+ 133 0034 9950     		str	r1, [r3, r2]
+  78:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	SIM_SCGC5 |= (SIM_SCGC5_PORTC_MASK | SIM_SCGC5_PORTB_MASK | SIM_SCGC5_PORTD_MASK | SIM_SCGC5_PORTE
+ 134              		.loc 1 78 0
+ 135 0036 1B4A     		ldr	r2, .L9+16
+ 136 0038 F021     		mov	r1, #240
+ 137 003a 9858     		ldr	r0, [r3, r2]
+ 138 003c 8901     		lsl	r1, r1, #6
+ 139 003e 0143     		orr	r1, r0
+ 140 0040 9950     		str	r1, [r3, r2]
+  79:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	
+  80:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTD_PCR1 |= PORT_PCR_MUX(4);
+ 141              		.loc 1 80 0
+ 142 0042 194B     		ldr	r3, .L9+20
+ 143 0044 8022     		mov	r2, #128
+ 144 0046 5868     		ldr	r0, [r3, #4]
+ 145 0048 D200     		lsl	r2, r2, #3
+ 146 004a 1043     		orr	r0, r2
+ 147 004c 5860     		str	r0, [r3, #4]
+  81:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTD_PCR3 |= PORT_PCR_MUX(4);
+ 148              		.loc 1 81 0
+ 149 004e D968     		ldr	r1, [r3, #12]
+  82:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTB_PCR3 |= PORT_PCR_MUX(4);
+  83:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR30 |= PORT_PCR_MUX(0);
+  84:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR20 |= PORT_PCR_MUX(0);
+  85:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	
+  86:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_SC |= (TPM_SC_PS(1) | TPM_SC_CMOD(1));
+  87:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C1SC |= (TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK);
+  88:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C3SC |= (TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK);
+  89:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	
+  90:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_MOD = TPM_MOD_MOD(54000);
+  91:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C1V = TPM_CnV_VAL(c1Mod);
+ 150              		.loc 1 91 0
+ 151 0050 2D04     		lsl	r5, r5, #16
+ 152              	.LVL6:
+  81:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTD_PCR3 |= PORT_PCR_MUX(4);
+ 153              		.loc 1 81 0
+ 154 0052 1143     		orr	r1, r2
+ 155 0054 D960     		str	r1, [r3, #12]
+  82:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTB_PCR3 |= PORT_PCR_MUX(4);
+ 156              		.loc 1 82 0
+ 157 0056 154B     		ldr	r3, .L9+24
+  83:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR30 |= PORT_PCR_MUX(0);
+ 158              		.loc 1 83 0
+ 159 0058 1549     		ldr	r1, .L9+28
+  82:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTB_PCR3 |= PORT_PCR_MUX(4);
+ 160              		.loc 1 82 0
+ 161 005a D868     		ldr	r0, [r3, #12]
+  92:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C3V = TPM_CnV_VAL(c3Mod); //6000 gives pulse width of 500us
+ 162              		.loc 1 92 0
+ 163 005c 2404     		lsl	r4, r4, #16
+ 164              	.LVL7:
+  82:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTB_PCR3 |= PORT_PCR_MUX(4);
+ 165              		.loc 1 82 0
+ 166 005e 0243     		orr	r2, r0
+ 167 0060 DA60     		str	r2, [r3, #12]
+  83:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR30 |= PORT_PCR_MUX(0);
+ 168              		.loc 1 83 0
+ 169 0062 8A6F     		ldr	r2, [r1, #120]
+  86:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_SC |= (TPM_SC_PS(1) | TPM_SC_CMOD(1));
+ 170              		.loc 1 86 0
+ 171 0064 1348     		ldr	r0, .L9+32
+  83:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR30 |= PORT_PCR_MUX(0);
+ 172              		.loc 1 83 0
+ 173 0066 8A67     		str	r2, [r1, #120]
+  84:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR20 |= PORT_PCR_MUX(0);
+ 174              		.loc 1 84 0
+ 175 0068 0B6D     		ldr	r3, [r1, #80]
+  86:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_SC |= (TPM_SC_PS(1) | TPM_SC_CMOD(1));
+ 176              		.loc 1 86 0
+ 177 006a 0922     		mov	r2, #9
+  84:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	PORTE_PCR20 |= PORT_PCR_MUX(0);
+ 178              		.loc 1 84 0
+ 179 006c 0B65     		str	r3, [r1, #80]
+  86:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_SC |= (TPM_SC_PS(1) | TPM_SC_CMOD(1));
+ 180              		.loc 1 86 0
+ 181 006e 0168     		ldr	r1, [r0]
+ 182 0070 0A43     		orr	r2, r1
+ 183 0072 0260     		str	r2, [r0]
+  87:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C1SC |= (TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK);
+ 184              		.loc 1 87 0
+ 185 0074 4369     		ldr	r3, [r0, #20]
+ 186 0076 2822     		mov	r2, #40
+ 187 0078 1343     		orr	r3, r2
+ 188 007a 4361     		str	r3, [r0, #20]
+  88:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C3SC |= (TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK);
+ 189              		.loc 1 88 0
+ 190 007c 416A     		ldr	r1, [r0, #36]
+  90:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_MOD = TPM_MOD_MOD(54000);
+ 191              		.loc 1 90 0
+ 192 007e 0E4B     		ldr	r3, .L9+36
+  88:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C3SC |= (TPM_CnSC_MSB_MASK | TPM_CnSC_ELSB_MASK);
+ 193              		.loc 1 88 0
+ 194 0080 0A43     		orr	r2, r1
+ 195 0082 4262     		str	r2, [r0, #36]
+ 196              		.loc 1 92 0
+ 197 0084 210C     		lsr	r1, r4, #16
+  91:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C1V = TPM_CnV_VAL(c1Mod);
+ 198              		.loc 1 91 0
+ 199 0086 2A0C     		lsr	r2, r5, #16
+  90:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_MOD = TPM_MOD_MOD(54000);
+ 200              		.loc 1 90 0
+ 201 0088 8360     		str	r3, [r0, #8]
+  91:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	TPM0_C1V = TPM_CnV_VAL(c1Mod);
+ 202              		.loc 1 91 0
+ 203 008a 8261     		str	r2, [r0, #24]
+ 204              		.loc 1 92 0
+ 205 008c 8162     		str	r1, [r0, #40]
+  93:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	
+  94:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	}
+ 206              		.loc 1 94 0
+ 207 008e 03B0     		add	sp, sp, #12
+ 208              		@ sp needed for prologue
+ 209 0090 30BD     		pop	{r4, r5, pc}
+ 210              	.L10:
+ 211 0092 C046     		.align	2
+ 212              	.L9:
+ 213 0094 00127A00 		.word	8000000
+ 214 0098 00700440 		.word	1074032640
+ 215 009c 3C100000 		.word	4156
+ 216 00a0 04100000 		.word	4100
+ 217 00a4 38100000 		.word	4152
+ 218 00a8 00C00440 		.word	1074053120
+ 219 00ac 00A00440 		.word	1074044928
+ 220 00b0 00D00440 		.word	1074057216
+ 221 00b4 00800340 		.word	1073971200
+ 222 00b8 F0D20000 		.word	54000
+ 223              		.cfi_endproc
+ 224              	.LFE2:
+ 226              		.section	.text.ADC0_IRQHandler,"ax",%progbits
+ 227              		.align	2
+ 228              		.global	ADC0_IRQHandler
+ 229              		.code	16
+ 230              		.thumb_func
+ 232              	ADC0_IRQHandler:
+ 233              	.LFB3:
+  95:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+  96:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** void ADC0_IRQHandler(){ 
+ 234              		.loc 1 96 0
+ 235              		.cfi_startproc
+  97:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	unsigned int local_throttle_flag;
+  98:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	int temp = ADC0_RA;
+ 236              		.loc 1 98 0
+ 237 0000 014B     		ldr	r3, .L12
+  99:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** }
+ 238              		.loc 1 99 0
+ 239              		@ sp needed for prologue
+  98:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	int temp = ADC0_RA;
+ 240              		.loc 1 98 0
+ 241 0002 1B69     		ldr	r3, [r3, #16]
+ 242              		.loc 1 99 0
+ 243 0004 7047     		bx	lr
+ 244              	.L13:
+ 245 0006 C046     		.align	2
+ 246              	.L12:
+ 247 0008 00B00340 		.word	1073983488
+ 248              		.cfi_endproc
+ 249              	.LFE3:
+ 251              		.global	__aeabi_i2d
+ 252              		.global	__aeabi_dmul
+ 253              		.global	__aeabi_dadd
+ 254              		.global	__aeabi_d2f
+ 255              		.global	__aeabi_f2d
+ 256              		.section	.text.startup.main,"ax",%progbits
+ 257              		.align	2
+ 258              		.global	main
+ 259              		.code	16
+ 260              		.thumb_func
+ 262              	main:
+ 263              	.LFB4:
+ 100:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+ 101:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** int main (void)
+ 102:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** {
+ 264              		.loc 1 102 0
+ 265              		.cfi_startproc
+ 266 0000 F8B5     		push	{r3, r4, r5, r6, r7, lr}
+ 267              	.LCFI3:
+ 268              		.cfi_def_cfa_offset 24
+ 269              		.cfi_offset 3, -24
+ 270              		.cfi_offset 4, -20
+ 271              		.cfi_offset 5, -16
+ 272              		.cfi_offset 6, -12
+ 273              		.cfi_offset 7, -8
+ 274              		.cfi_offset 14, -4
+ 275 0002 5646     		mov	r6, sl
+ 276 0004 4D46     		mov	r5, r9
+ 277 0006 4446     		mov	r4, r8
+ 278 0008 5F46     		mov	r7, fp
+ 279 000a F0B4     		push	{r4, r5, r6, r7}
+ 280              	.LCFI4:
+ 281              		.cfi_def_cfa_offset 40
+ 282              		.cfi_offset 8, -40
+ 283              		.cfi_offset 9, -36
+ 284              		.cfi_offset 10, -32
+ 285              		.cfi_offset 11, -28
+ 103:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     	char ch;
+ 104:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 
+ 105:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****         
+ 106:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #ifdef CMSIS  // If we are conforming to CMSIS, we need to call start here
+ 107:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     start();
+ 108:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** #endif
+ 109:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     
+ 110:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     
+ 111:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     //The following section of code represents our parsing.
+ 112:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****   	printf("\n\rRunning the platinum project.\n\r");
+ 286              		.loc 1 112 0
+ 287 000c 5A48     		ldr	r0, .L33+16
+ 288 000e FFF7FEFF 		bl	printf
+ 289              	.LVL8:
+ 113:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****   	printf("\n\rUse the '1' and '2' key to adjust the vertical axis.\n\r");
+ 290              		.loc 1 113 0
+ 291 0012 5A48     		ldr	r0, .L33+20
+ 292 0014 FFF7FEFF 		bl	printf
+ 293              	.LVL9:
+ 114:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****   	printf("\n\rUse the 'q' and 'w' key to adjust the horizontal axis.\n\r");
+ 294              		.loc 1 114 0
+ 295 0018 5948     		ldr	r0, .L33+24
+ 296 001a FFF7FEFF 		bl	printf
+ 297              	.LVL10:
+ 115:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****   	printf("\n\rUse the '?' key to to get a current readout of the positions of the horizontal and v
+ 298              		.loc 1 115 0
+ 299 001e 5948     		ldr	r0, .L33+28
+ 300 0020 FFF7FEFF 		bl	printf
+ 301              	.LVL11:
+ 302 0024 584A     		ldr	r2, .L33+32
+ 303 0026 594B     		ldr	r3, .L33+36
+ 116:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     int degrees = 0;
+ 117:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     int degrees2 = 0;
+ 118:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	while(1)
+ 119:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 	{
+ 120:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		out_char('>'); //Begins each line with a '>' symbol, this is simply for aesthetic purposes.
+ 121:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		ch = in_char();
+ 122:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    if (ch == '1'){ //Command to move vertical axis positive three degrees.
+ 123:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	if (c1Mod < 24000){
+ 304              		.loc 1 123 0
+ 305 0028 5948     		ldr	r0, .L33+40
+ 306 002a 5A4C     		ldr	r4, .L33+44
+ 307 002c 5A4E     		ldr	r6, .L33+48
+ 117:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     int degrees2 = 0;
+ 308              		.loc 1 117 0
+ 309 002e 0027     		mov	r7, #0
+ 116:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c ****     int degrees = 0;
+ 310              		.loc 1 116 0
+ 311 0030 0025     		mov	r5, #0
+ 312 0032 9246     		mov	sl, r2
+ 313 0034 9946     		mov	r9, r3
+ 314              		.loc 1 123 0
+ 315 0036 8046     		mov	r8, r0
+ 316              	.LVL12:
+ 317              	.L26:
+ 120:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		out_char('>'); //Begins each line with a '>' symbol, this is simply for aesthetic purposes.
+ 318              		.loc 1 120 0
+ 319 0038 3E20     		mov	r0, #62
+ 320 003a FFF7FEFF 		bl	out_char
+ 321              	.LVL13:
+ 121:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		ch = in_char();
+ 322              		.loc 1 121 0
+ 323 003e FFF7FEFF 		bl	in_char
+ 324              	.LVL14:
+ 122:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    if (ch == '1'){ //Command to move vertical axis positive three degrees.
+ 325              		.loc 1 122 0
+ 326 0042 3128     		cmp	r0, #49
+ 327 0044 11D0     		beq	.L28
+ 328              	.LVL15:
+ 329              	.L16:
+ 124:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 125:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod += 400;
+ 126:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees = degrees + 3;
+ 127:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 128:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The vertical axis is %d degrees\n\r", degrees);
+ 129:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	}
+ 130:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	else {printf ("Servo cannot go higher than 90 degrees. Out of bounds.\n\r");}
+ 131:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	}
+ 132:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			else if (ch == '2') //Command to move vertical axis negative three degrees.
+ 330              		.loc 1 132 0
+ 331 0046 3228     		cmp	r0, #50
+ 332 0048 47D0     		beq	.L29
+ 133:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			{
+ 134:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 135:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				if(c1Mod > 12000){
+ 136:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod -= 400;
+ 137:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees = degrees - 3;
+ 138:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 139:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The vertical axis is %d \n\r", degrees);	
+ 140:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				}
+ 141:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				else{printf ("Servo cannot go lower than 0 degrees. Out of bounds.\n\r");}
+ 142:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			}
+ 143:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			else if (ch == '?') //Provides readout of current servo position.
+ 333              		.loc 1 143 0
+ 334 004a 3F28     		cmp	r0, #63
+ 335 004c 57D0     		beq	.L30
+ 144:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			{
+ 145:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 146:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				float pw1 = (1 +(c1Mod - 12000)*.000083333333333333);
+ 147:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				float pw2 = (1 +(c3Mod - 12000)*.000083333333333333);
+ 148:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf(" Vertical Axis: %d degrees. Pulse width %f msec \n\r", degrees, pw1);
+ 149:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf(" Horizontal Axis: %d degrees. Pulse width %f msec \n\r", degrees2, pw2);
+ 150:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			}
+ 151:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			
+ 152:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    else if (ch == 'q') //Command to move horizontal axis positive three degrees.
+ 336              		.loc 1 152 0
+ 337 004e 7128     		cmp	r0, #113
+ 338 0050 21D0     		beq	.L31
+ 153:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    {
+ 154:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	if (c1Mod < 24000){
+ 155:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 156:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c3Mod += 400;
+ 157:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees2 = degrees2 + 3;
+ 158:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 159:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The horizontal axis is %d \n\r", degrees2);
+ 160:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	}
+ 161:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	else {printf ("Servo cannot go higher than 90 degrees. Out of bounds.\n\r");}
+ 162:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			}
+ 163:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			else if (ch == 'w') //Command to move horizontal axis negative three degrees.
+ 339              		.loc 1 163 0
+ 340 0052 7728     		cmp	r0, #119
+ 341 0054 31D0     		beq	.L32
+ 164:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			{
+ 165:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				if(c1Mod > 12000){
+ 166:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 167:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees2 = degrees2 - 3;
+ 168:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c3Mod -= 400;
+ 169:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 170:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The horizontal axis is %d \n\r", degrees2);		
+ 171:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				}
+ 172:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				else{printf ("Servo cannot go lower than 0 degrees. Out of bounds.\n\r");}
+ 173:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			}
+ 174:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 			else{
+ 175:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("Invalid command, Please enter 1, 2, q, e, or ?. \n\r");
+ 342              		.loc 1 175 0
+ 343 0056 4846     		mov	r0, r9
+ 344 0058 FFF7FEFF 		bl	printf
+ 345              	.LVL16:
+ 120:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		out_char('>'); //Begins each line with a '>' symbol, this is simply for aesthetic purposes.
+ 346              		.loc 1 120 0
+ 347 005c 3E20     		mov	r0, #62
+ 348 005e FFF7FEFF 		bl	out_char
+ 349              	.LVL17:
+ 121:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		ch = in_char();
+ 350              		.loc 1 121 0
+ 351 0062 FFF7FEFF 		bl	in_char
+ 352              	.LVL18:
+ 122:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    if (ch == '1'){ //Command to move vertical axis positive three degrees.
+ 353              		.loc 1 122 0
+ 354 0066 3128     		cmp	r0, #49
+ 355 0068 EDD1     		bne	.L16
+ 356              	.LVL19:
+ 357              	.L28:
+ 123:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	if (c1Mod < 24000){
+ 358              		.loc 1 123 0
+ 359 006a 2268     		ldr	r2, [r4]
+ 360 006c 4245     		cmp	r2, r8
+ 361 006e 0EDC     		bgt	.L23
+ 124:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 362              		.loc 1 124 0
+ 363 0070 FFF7FEFF 		bl	out_char
+ 364              	.LVL20:
+ 125:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod += 400;
+ 365              		.loc 1 125 0
+ 366 0074 2068     		ldr	r0, [r4]
+ 127:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 367              		.loc 1 127 0
+ 368 0076 3168     		ldr	r1, [r6]
+ 125:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod += 400;
+ 369              		.loc 1 125 0
+ 370 0078 9130     		add	r0, r0, #145
+ 371 007a FF30     		add	r0, r0, #255
+ 126:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees = degrees + 3;
+ 372              		.loc 1 126 0
+ 373 007c 0335     		add	r5, r5, #3
+ 374              	.LVL21:
+ 125:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod += 400;
+ 375              		.loc 1 125 0
+ 376 007e 2060     		str	r0, [r4]
+ 127:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 377              		.loc 1 127 0
+ 378 0080 FFF7FEFF 		bl	pulse
+ 379              	.LVL22:
+ 128:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The vertical axis is %d degrees\n\r", degrees);
+ 380              		.loc 1 128 0
+ 381 0084 291C     		mov	r1, r5
+ 382 0086 4548     		ldr	r0, .L33+52
+ 383 0088 FFF7FEFF 		bl	printf
+ 384              	.LVL23:
+ 385 008c D4E7     		b	.L26
+ 386              	.L23:
+ 161:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	else {printf ("Servo cannot go higher than 90 degrees. Out of bounds.\n\r");}
+ 387              		.loc 1 161 0
+ 388 008e 5046     		mov	r0, sl
+ 389 0090 FFF7FEFF 		bl	printf
+ 390              	.LVL24:
+ 391 0094 D0E7     		b	.L26
+ 392              	.L31:
+ 154:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 		    	if (c1Mod < 24000){
+ 393              		.loc 1 154 0
+ 394 0096 2368     		ldr	r3, [r4]
+ 395 0098 4345     		cmp	r3, r8
+ 396 009a F8DC     		bgt	.L23
+ 155:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 397              		.loc 1 155 0
+ 398 009c FFF7FEFF 		bl	out_char
+ 399              	.LVL25:
+ 156:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c3Mod += 400;
+ 400              		.loc 1 156 0
+ 401 00a0 3168     		ldr	r1, [r6]
+ 157:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees2 = degrees2 + 3;
+ 402              		.loc 1 157 0
+ 403 00a2 0337     		add	r7, r7, #3
+ 404              	.LVL26:
+ 156:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c3Mod += 400;
+ 405              		.loc 1 156 0
+ 406 00a4 9131     		add	r1, r1, #145
+ 407 00a6 FF31     		add	r1, r1, #255
+ 408 00a8 3160     		str	r1, [r6]
+ 409              	.L27:
+ 169:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 410              		.loc 1 169 0
+ 411 00aa 2068     		ldr	r0, [r4]
+ 412 00ac FFF7FEFF 		bl	pulse
+ 413              	.LVL27:
+ 170:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The horizontal axis is %d \n\r", degrees2);		
+ 414              		.loc 1 170 0
+ 415 00b0 391C     		mov	r1, r7
+ 416 00b2 3B48     		ldr	r0, .L33+56
+ 417 00b4 FFF7FEFF 		bl	printf
+ 418              	.LVL28:
+ 419 00b8 BEE7     		b	.L26
+ 420              	.L32:
+ 165:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				if(c1Mod > 12000){
+ 421              		.loc 1 165 0
+ 422 00ba 3A49     		ldr	r1, .L33+60
+ 423 00bc 2268     		ldr	r2, [r4]
+ 424 00be 8A42     		cmp	r2, r1
+ 425 00c0 07DD     		ble	.L25
+ 166:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 426              		.loc 1 166 0
+ 427 00c2 FFF7FEFF 		bl	out_char
+ 428              	.LVL29:
+ 168:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c3Mod -= 400;
+ 429              		.loc 1 168 0
+ 430 00c6 3168     		ldr	r1, [r6]
+ 167:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees2 = degrees2 - 3;
+ 431              		.loc 1 167 0
+ 432 00c8 033F     		sub	r7, r7, #3
+ 433              	.LVL30:
+ 168:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c3Mod -= 400;
+ 434              		.loc 1 168 0
+ 435 00ca 9139     		sub	r1, r1, #145
+ 436 00cc FF39     		sub	r1, r1, #255
+ 437 00ce 3160     		str	r1, [r6]
+ 438 00d0 EBE7     		b	.L27
+ 439              	.L25:
+ 172:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				else{printf ("Servo cannot go lower than 0 degrees. Out of bounds.\n\r");}
+ 440              		.loc 1 172 0
+ 441 00d2 3548     		ldr	r0, .L33+64
+ 442 00d4 FFF7FEFF 		bl	printf
+ 443              	.LVL31:
+ 444 00d8 AEE7     		b	.L26
+ 445              	.L29:
+ 134:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 446              		.loc 1 134 0
+ 447 00da FFF7FEFF 		bl	out_char
+ 448              	.LVL32:
+ 135:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				if(c1Mod > 12000){
+ 449              		.loc 1 135 0
+ 450 00de 2068     		ldr	r0, [r4]
+ 451 00e0 3049     		ldr	r1, .L33+60
+ 452 00e2 8842     		cmp	r0, r1
+ 453 00e4 F5DD     		ble	.L25
+ 136:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod -= 400;
+ 454              		.loc 1 136 0
+ 455 00e6 9138     		sub	r0, r0, #145
+ 138:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 456              		.loc 1 138 0
+ 457 00e8 3168     		ldr	r1, [r6]
+ 136:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod -= 400;
+ 458              		.loc 1 136 0
+ 459 00ea FF38     		sub	r0, r0, #255
+ 137:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				degrees = degrees - 3;
+ 460              		.loc 1 137 0
+ 461 00ec 033D     		sub	r5, r5, #3
+ 462              	.LVL33:
+ 136:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				c1Mod -= 400;
+ 463              		.loc 1 136 0
+ 464 00ee 2060     		str	r0, [r4]
+ 138:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				pulse(c1Mod, c3Mod);
+ 465              		.loc 1 138 0
+ 466 00f0 FFF7FEFF 		bl	pulse
+ 467              	.LVL34:
+ 139:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf("The vertical axis is %d \n\r", degrees);	
+ 468              		.loc 1 139 0
+ 469 00f4 291C     		mov	r1, r5
+ 470 00f6 2D48     		ldr	r0, .L33+68
+ 471 00f8 FFF7FEFF 		bl	printf
+ 472              	.LVL35:
+ 473 00fc 9CE7     		b	.L26
+ 474              	.L30:
+ 475              	.LBB2:
+ 145:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				out_char(ch);
+ 476              		.loc 1 145 0
+ 477 00fe FFF7FEFF 		bl	out_char
+ 478              	.LVL36:
+ 147:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				float pw2 = (1 +(c3Mod - 12000)*.000083333333333333);
+ 479              		.loc 1 147 0
+ 480 0102 3268     		ldr	r2, [r6]
+ 481 0104 2A4B     		ldr	r3, .L33+72
+ 482 0106 D018     		add	r0, r2, r3
+ 483 0108 FFF7FEFF 		bl	__aeabi_i2d
+ 484              	.LVL37:
+ 485 010c 174B     		ldr	r3, .L33+4
+ 486 010e 164A     		ldr	r2, .L33
+ 487 0110 FFF7FEFF 		bl	__aeabi_dmul
+ 488              	.LVL38:
+ 489 0114 164A     		ldr	r2, .L33+8
+ 490 0116 174B     		ldr	r3, .L33+12
+ 491 0118 FFF7FEFF 		bl	__aeabi_dadd
+ 492              	.LVL39:
+ 493 011c FFF7FEFF 		bl	__aeabi_d2f
+ 494              	.LVL40:
+ 146:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				float pw1 = (1 +(c1Mod - 12000)*.000083333333333333);
+ 495              		.loc 1 146 0
+ 496 0120 2268     		ldr	r2, [r4]
+ 497              	.LVL41:
+ 498 0122 234B     		ldr	r3, .L33+72
+ 147:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				float pw2 = (1 +(c3Mod - 12000)*.000083333333333333);
+ 499              		.loc 1 147 0
+ 500 0124 8346     		mov	fp, r0
+ 501              	.LVL42:
+ 146:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				float pw1 = (1 +(c1Mod - 12000)*.000083333333333333);
+ 502              		.loc 1 146 0
+ 503 0126 D018     		add	r0, r2, r3
+ 504              	.LVL43:
+ 505 0128 FFF7FEFF 		bl	__aeabi_i2d
+ 506              	.LVL44:
+ 507 012c 0F4B     		ldr	r3, .L33+4
+ 508 012e 0E4A     		ldr	r2, .L33
+ 509 0130 FFF7FEFF 		bl	__aeabi_dmul
+ 510              	.LVL45:
+ 511 0134 0E4A     		ldr	r2, .L33+8
+ 512 0136 0F4B     		ldr	r3, .L33+12
+ 513 0138 FFF7FEFF 		bl	__aeabi_dadd
+ 514              	.LVL46:
+ 515 013c FFF7FEFF 		bl	__aeabi_d2f
+ 516              	.LVL47:
+ 148:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf(" Vertical Axis: %d degrees. Pulse width %f msec \n\r", degrees, pw1);
+ 517              		.loc 1 148 0
+ 518 0140 FFF7FEFF 		bl	__aeabi_f2d
+ 519              	.LVL48:
+ 520 0144 021C     		mov	r2, r0
+ 521 0146 0B1C     		mov	r3, r1
+ 522 0148 1A48     		ldr	r0, .L33+76
+ 523 014a 291C     		mov	r1, r5
+ 524 014c FFF7FEFF 		bl	printf
+ 525              	.LVL49:
+ 149:C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum\platinum.c **** 				printf(" Horizontal Axis: %d degrees. Pulse width %f msec \n\r", degrees2, pw2);
+ 526              		.loc 1 149 0
+ 527 0150 5846     		mov	r0, fp
+ 528 0152 FFF7FEFF 		bl	__aeabi_f2d
+ 529              	.LVL50:
+ 530 0156 021C     		mov	r2, r0
+ 531 0158 0B1C     		mov	r3, r1
+ 532 015a 1748     		ldr	r0, .L33+80
+ 533 015c 391C     		mov	r1, r7
+ 534 015e FFF7FEFF 		bl	printf
+ 535              	.LVL51:
+ 536 0162 69E7     		b	.L26
+ 537              	.L34:
+ 538 0164 C046C046 		.align	3
+ 539              	.L33:
+ 540 0168 8DE2ECC3 		.word	-1007885683
+ 541 016c 67D8153F 		.word	1058396263
+ 542 0170 00000000 		.word	0
+ 543 0174 0000F03F 		.word	1072693248
+ 544 0178 00000000 		.word	.LC3
+ 545 017c 24000000 		.word	.LC5
+ 546 0180 60000000 		.word	.LC7
+ 547 0184 9C000000 		.word	.LC9
+ 548 0188 28010000 		.word	.LC15
+ 549 018c 44020000 		.word	.LC27
+ 550 0190 BF5D0000 		.word	23999
+ 551 0194 00000000 		.word	.LANCHOR3
+ 552 0198 00000000 		.word	.LANCHOR4
+ 553 019c 04010000 		.word	.LC13
+ 554 01a0 24020000 		.word	.LC25
+ 555 01a4 E02E0000 		.word	12000
+ 556 01a8 80010000 		.word	.LC19
+ 557 01ac 64010000 		.word	.LC17
+ 558 01b0 20D1FFFF 		.word	-12000
+ 559 01b4 B8010000 		.word	.LC21
+ 560 01b8 EC010000 		.word	.LC23
+ 561              	.LBE2:
+ 562              		.cfi_endproc
+ 563              	.LFE4:
+ 565              		.global	prstbl
+ 566              		.global	c3Mod
+ 567              		.global	c1Mod
+ 568 01bc C046C046 		.section	.bss.command,"aw",%nobits
+ 569              		.align	2
+ 570              		.set	.LANCHOR1,. + 0
+ 573              	command:
+ 574 0000 00000000 		.space	35
+ 574      00000000 
+ 574      00000000 
+ 574      00000000 
+ 574      00000000 
+ 575 0023 00       		.section	.data.c1Mod,"aw",%progbits
+ 576              		.align	2
+ 577              		.set	.LANCHOR3,. + 0
+ 580              	c1Mod:
+ 581 0000 E02E0000 		.word	12000
+ 582              		.section	.bss.cmdflg,"aw",%nobits
+ 583              		.align	2
+ 584              		.set	.LANCHOR2,. + 0
+ 587              	cmdflg:
+ 588 0000 00000000 		.space	4
+ 589              		.section	.data.c3Mod,"aw",%progbits
+ 590              		.align	2
+ 591              		.set	.LANCHOR4,. + 0
+ 594              	c3Mod:
+ 595 0000 E02E0000 		.word	12000
+ 596              		.section	.rodata.str1.4,"aMS",%progbits,1
+ 597              		.align	2
+ 598              	.LC3:
+ 599 0000 0A0D5275 		.ascii	"\012\015Running the platinum project.\012\015\000"
+ 599      6E6E696E 
+ 599      67207468 
+ 599      6520706C 
+ 599      6174696E 
+ 600 0022 0000     		.space	2
+ 601              	.LC5:
+ 602 0024 0A0D5573 		.ascii	"\012\015Use the '1' and '2' key to adjust the verti"
+ 602      65207468 
+ 602      65202731 
+ 602      2720616E 
+ 602      64202732 
+ 603 0051 63616C20 		.ascii	"cal axis.\012\015\000"
+ 603      61786973 
+ 603      2E0A0D00 
+ 604 005d 000000   		.space	3
+ 605              	.LC7:
+ 606 0060 0A0D5573 		.ascii	"\012\015Use the 'q' and 'w' key to adjust the horiz"
+ 606      65207468 
+ 606      65202771 
+ 606      2720616E 
+ 606      64202777 
+ 607 008d 6F6E7461 		.ascii	"ontal axis.\012\015\000"
+ 607      6C206178 
+ 607      69732E0A 
+ 607      0D00
+ 608 009b 00       		.space	1
+ 609              	.LC9:
+ 610 009c 0A0D5573 		.ascii	"\012\015Use the '?' key to to get a current readout"
+ 610      65207468 
+ 610      6520273F 
+ 610      27206B65 
+ 610      7920746F 
+ 611 00c9 206F6620 		.ascii	" of the positions of the horizontal and vertical ax"
+ 611      74686520 
+ 611      706F7369 
+ 611      74696F6E 
+ 611      73206F66 
+ 612 00fc 69732E0A 		.ascii	"is.\012\015\000"
+ 612      0D00
+ 613 0102 0000     		.space	2
+ 614              	.LC13:
+ 615 0104 54686520 		.ascii	"The vertical axis is %d degrees\012\015\000"
+ 615      76657274 
+ 615      6963616C 
+ 615      20617869 
+ 615      73206973 
+ 616 0126 0000     		.space	2
+ 617              	.LC15:
+ 618 0128 53657276 		.ascii	"Servo cannot go higher than 90 degrees. Out of boun"
+ 618      6F206361 
+ 618      6E6E6F74 
+ 618      20676F20 
+ 618      68696768 
+ 619 015b 64732E0A 		.ascii	"ds.\012\015\000"
+ 619      0D00
+ 620 0161 000000   		.space	3
+ 621              	.LC17:
+ 622 0164 54686520 		.ascii	"The vertical axis is %d \012\015\000"
+ 622      76657274 
+ 622      6963616C 
+ 622      20617869 
+ 622      73206973 
+ 623 017f 00       		.space	1
+ 624              	.LC19:
+ 625 0180 53657276 		.ascii	"Servo cannot go lower than 0 degrees. Out of bounds"
+ 625      6F206361 
+ 625      6E6E6F74 
+ 625      20676F20 
+ 625      6C6F7765 
+ 626 01b3 2E0A0D00 		.ascii	".\012\015\000"
+ 627 01b7 00       		.space	1
+ 628              	.LC21:
+ 629 01b8 20566572 		.ascii	" Vertical Axis: %d degrees. Pulse width %f msec \012"
+ 629      74696361 
+ 629      6C204178 
+ 629      69733A20 
+ 629      25642064 
+ 630 01e9 0D00     		.ascii	"\015\000"
+ 631 01eb 00       		.space	1
+ 632              	.LC23:
+ 633 01ec 20486F72 		.ascii	" Horizontal Axis: %d degrees. Pulse width %f msec \012"
+ 633      697A6F6E 
+ 633      74616C20 
+ 633      41786973 
+ 633      3A202564 
+ 634 021f 0D00     		.ascii	"\015\000"
+ 635 0221 000000   		.space	3
+ 636              	.LC25:
+ 637 0224 54686520 		.ascii	"The horizontal axis is %d \012\015\000"
+ 637      686F7269 
+ 637      7A6F6E74 
+ 637      616C2061 
+ 637      78697320 
+ 638 0241 000000   		.space	3
+ 639              	.LC27:
+ 640 0244 496E7661 		.ascii	"Invalid command, Please enter 1, 2, q, e, or ?. \012"
+ 640      6C696420 
+ 640      636F6D6D 
+ 640      616E642C 
+ 640      20506C65 
+ 641 0275 0D00     		.ascii	"\015\000"
+ 642 0277 00       		.space	1
+ 643              	.LC29:
+ 644 0278 53455400 		.ascii	"SET\000"
+ 645              	.LC30:
+ 646 027c 47455400 		.ascii	"GET\000"
+ 647              	.LC31:
+ 648 0280 53544154 		.ascii	"STATUS\000"
+ 648      555300
+ 649 0287 00       		.section	.data.prstbl,"aw",%progbits
+ 650              		.align	2
+ 653              	prstbl:
+ 654 0000 78020000 		.word	.LC29
+ 655 0004 00000000 		.word	0
+ 656 0008 01000000 		.word	1
+ 657 000c 01000000 		.word	1
+ 658 0010 01000000 		.word	1
+ 659 0014 7C020000 		.word	.LC30
+ 660 0018 01000000 		.word	1
+ 661 001c 01000000 		.word	1
+ 662 0020 01000000 		.word	1
+ 663 0024 01000000 		.word	1
+ 664 0028 80020000 		.word	.LC31
+ 665 002c 02000000 		.word	2
+ 666 0030 01000000 		.word	1
+ 667 0034 01000000 		.word	1
+ 668 0038 00000000 		.word	0
+ 669              		.section	.bss.i.5193,"aw",%nobits
+ 670              		.set	.LANCHOR0,. + 0
+ 673              	i.5193:
+ 674 0000 00       		.space	1
+ 675              		.text
+ 676              	.Letext0:
+ 677              		.file 2 "C:/Freescale/CW MCU v10.6/MCU/ARM_GCC_Support/ewl/EWL_C/include/cstdint"
+ 678              		.file 3 "C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/cpu/headers/MKL25Z4.h"
+ 679              		.file 4 "C:/Users/Tobin/Desktop/kl25_sc_rev10/klxx-sc-baremetal/src/projects/platinum/ddefs2.h"
+DEFINED SYMBOLS
+                            *ABS*:00000000 platinum.c
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:18     .text.UART0_get_cmd:00000000 $t
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:23     .text.UART0_get_cmd:00000000 UART0_get_cmd
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:73     .text.UART0_get_cmd:00000030 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:80     .text.pulse:00000000 $t
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:85     .text.pulse:00000000 pulse
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:213    .text.pulse:00000094 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:227    .text.ADC0_IRQHandler:00000000 $t
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:232    .text.ADC0_IRQHandler:00000000 ADC0_IRQHandler
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:247    .text.ADC0_IRQHandler:00000008 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:257    .text.startup.main:00000000 $t
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:262    .text.startup.main:00000000 main
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:540    .text.startup.main:00000168 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:653    .data.prstbl:00000000 prstbl
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:594    .data.c3Mod:00000000 c3Mod
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:580    .data.c1Mod:00000000 c1Mod
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:569    .bss.command:00000000 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:573    .bss.command:00000000 command
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:576    .data.c1Mod:00000000 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:583    .bss.cmdflg:00000000 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:587    .bss.cmdflg:00000000 cmdflg
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:590    .data.c3Mod:00000000 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:597    .rodata.str1.4:00000000 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:650    .data.prstbl:00000000 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:673    .bss.i.5193:00000000 i.5193
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:674    .bss.i.5193:00000000 $d
+                     .debug_frame:00000010 $d
+C:\Users\Tobin\AppData\Local\Temp\ccCmvRh5.s:568    .text.startup.main:000001bc $t
+
+UNDEFINED SYMBOLS
+in_char
+out_char
+pll_init
+__aeabi_i2d
+__aeabi_dmul
+__aeabi_dadd
+__aeabi_d2f
+__aeabi_f2d
+printf
